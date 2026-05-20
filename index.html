@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CargoFlow</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="navbar">
+    <div class="logo">CargoFlow</div>
+    <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="/admin">Admin Panel</a>
+    </div>
+</div>
+
+<section class="hero-section">
+    <div class="hero-content">
+        <h1>Fast and Reliable Cargo Tracking</h1>
+        <p>Track your shipment status, current location, and delivery progress in real time using CargoFlow.</p>
+
+        <div class="hero-buttons">
+            <a href="#tracking" class="primary-btn">Track Shipment</a>
+        </div>
+
+        <div class="stats">
+            <div><strong>5</strong><span>Delivery Stages</span></div>
+            <div><strong>24/7</strong><span>Tracking</span></div>
+            <div><strong>Secure</strong><span>Admin Access</span></div>
+        </div>
+    </div>
+
+    <div class="hero-card">
+        <h2>Shipment Tracking</h2>
+        <p>Enter your tracking ID below.</p>
+
+        <div class="search-box" id="tracking">
+            <input type="text" id="trackingId" placeholder="Example: TK67">
+            <button onclick="trackShipment()">Track</button>
+        </div>
+    </div>
+</section>
+
+<div class="page">
+    <div id="result" class="result"></div>
+
+    <div class="features">
+        <div class="feature-card">
+            <h3>Fast Tracking</h3>
+            <p>Customers can check shipment updates instantly using a tracking ID.</p>
+        </div>
+
+        <div class="feature-card">
+            <h3>Admin Control</h3>
+            <p>Admins can add, renew, and update shipment status securely.</p>
+        </div>
+
+        <div class="feature-card">
+            <h3>Progress View</h3>
+            <p>The system shows which delivery stage the shipment has reached.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+const stages = ["Order Created", "Picked Up", "In Transit", "Out for Delivery", "Delivered"];
+
+function getStageIndex(status) {
+    const cleanStatus = status.toLowerCase();
+
+    if (cleanStatus.includes("created")) return 0;
+    if (cleanStatus.includes("picked")) return 1;
+    if (cleanStatus.includes("transit")) return 2;
+    if (cleanStatus.includes("out")) return 3;
+    if (cleanStatus.includes("delivered")) return 4;
+
+    return 0;
+}
+
+function getEstimatedDelivery(status) {
+    const cleanStatus = status.toLowerCase();
+
+    if (cleanStatus.includes("created")) return "4 - 6 Business Days";
+    if (cleanStatus.includes("picked")) return "3 - 5 Business Days";
+    if (cleanStatus.includes("transit")) return "2 - 4 Business Days";
+    if (cleanStatus.includes("out")) return "Expected Today";
+    if (cleanStatus.includes("delivered")) return "Shipment Delivered";
+
+    return "Updating...";
+}
+
+function createProgress(status) {
+    const currentStage = getStageIndex(status);
+    let html = `<div class="progress">`;
+
+    stages.forEach((stage, index) => {
+        const active = index <= currentStage ? "active" : "";
+
+        html += `
+            <div class="step ${active}">
+                <div class="circle">${index <= currentStage ? "✓" : index + 1}</div>
+                <span>${stage}</span>
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+    return html;
+}
+
+function trackShipment() {
+    const trackingId = document.getElementById("trackingId").value;
+
+    if (!trackingId) {
+        document.getElementById("result").innerHTML =
+            `<p class="error">Please enter a tracking ID.</p>`;
+        return;
+    }
+
+    fetch(`/api/track/${trackingId}`)
+        .then(response => response.json())
+        .then(data => {
+            const result = document.getElementById("result");
+
+            if (data.error) {
+                result.innerHTML = `<div class="card"><p class="error">${data.error}</p></div>`;
+            } else {
+                result.innerHTML = `
+                    <div class="card">
+                        <h2 class="form-title">Shipment Details</h2>
+
+                        ${createProgress(data.status)}
+
+                        <div class="details-grid">
+                            <div class="detail-box">
+                                <span>Tracking ID</span>
+                                <strong>${data.tracking_id}</strong>
+                            </div>
+
+                            <div class="detail-box">
+                                <span>Status</span>
+                                <strong>${data.status}</strong>
+                            </div>
+
+                            <div class="detail-box">
+                                <span>Sender</span>
+                                <strong>${data.sender}</strong>
+                            </div>
+
+                            <div class="detail-box">
+                                <span>Receiver</span>
+                                <strong>${data.receiver}</strong>
+                            </div>
+
+                            <div class="detail-box">
+                                <span>Current Location</span>
+                                <strong>${data.location}</strong>
+                            </div>
+
+                            <div class="detail-box">
+                                <span>Estimated Delivery</span>
+                                <strong>${getEstimatedDelivery(data.status)}</strong>
+                            </div>
+                        </div>
+
+                        <div class="history-box">
+                            <h3>Tracking History</h3>
+                            <div id="trackingHistory"></div>
+                        </div>
+                    </div>
+                `;
+
+                fetch(`/api/history/${trackingId}`)
+                    .then(response => response.json())
+                    .then(historyData => {
+                        const historyContainer = document.getElementById("trackingHistory");
+
+                        historyContainer.innerHTML = "";
+
+                        if (historyData.length === 0) {
+                            historyContainer.innerHTML = `<p>No history available yet.</p>`;
+                            return;
+                        }
+
+                        historyData.forEach(item => {
+                            historyContainer.innerHTML += `
+                                <div class="history-item">
+                                    <strong>${item.status}</strong>
+                                    <span>${item.location}</span>
+                                    <small>${item.updated_at}</small>
+                                </div>
+                            `;
+                        });
+                    });
+            }
+        });
+}
+
+</script>
+
+</body>
+</html>
